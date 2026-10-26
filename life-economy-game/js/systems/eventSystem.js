@@ -1,0 +1,9 @@
+(() => {const G=Game;
+G.eventWeight=(s,event)=>{
+ const origins=[G.data.talents.find(x=>x.id===s.character.talent),G.data.backgrounds.find(x=>x.id===s.character.background)];
+ const related=origins.some(origin=>Object.keys(origin?.growthModifiers||{}).some(path=>event.choices?.some(choice=>(choice.effects?.[path]||0)>0)));
+ return event.weight*(related?1.25:1);
+};
+G.selectWeightedEvent=(s,rng=Math.random)=>{const roll=rng(),rate=s.phase==='youth'?.72:(s.historical?.25:.45);if(roll>=rate){if(roll<rate+.25){const news='동네 사람들이 물건을 나누는 작은 장터가 열렸어요.';G.recordHistory(s,'news','일상의 작은 소식',news);s.report.messages.push(news);}else s.report.messages.push('큰 사건 없이, 나의 일상에 집중한 시간이었어요.');return null;}const list=[...G.data.events,...(s.business?G.data.businessEvents:[])].filter(e=>G.checkConditions(s,e.conditions)&&(s.cooldowns[e.id]===undefined||s.turn-s.cooldowns[e.id]>=e.cooldown));let r=rng()*list.reduce((t,e)=>t+G.eventWeight(s,e),0);return list.find(e=>(r-=G.eventWeight(s,e))<0)||null;};
+G.resolveEventChoice=(s,index)=>{const event=[...G.data.events,...G.data.businessEvents].find(e=>e.id===s.pendingEvent);if(!event||!event.choices[index])throw Error('선택지를 다시 확인해 주세요.');const c=event.choices[index],changes=G.applyEffects(s,c.effects);(c.delayed||[]).forEach(d=>s.delayed.push({...d,turn:s.turn+d.after,...(Object.keys(d.effects).some(k=>k.startsWith('business.'))?{businessId:s.business?.instanceId}: {})}));s.cooldowns[event.id]=s.turn;G.recordHistory(s,event.category==='family'?'family':event.category==='opportunity'?'milestone':'event',event.title,c.resultText,{choice:c.name});s.pendingEvent=null;s.report.changes.push(...changes);if(event.category==='family')s.report.messages.push(c.resultText);else G.addNPCDialogue(s,G.eventNPC(s,event),event.title+' · 나의 선택에 대한 답',c.reply||c.resultText);if(event.tip)s.report.tip=event.tip;G.finishTurn(s);};
+})();
